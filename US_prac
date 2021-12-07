@@ -1,0 +1,62 @@
+const int pingPin = 6;
+const int echoPin = 7;
+const int pingPinSide = 5;
+const int echoPinSide = 8;
+
+int x,y;
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+
+
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  x = ping_front();
+  y = ping_side();
+  delay(500);
+  
+  
+}
+
+int ping_front(){
+  long duration, inches, cm;
+  pinMode(pingPin, OUTPUT);
+  digitalWrite(pingPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(pingPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pingPin, LOW);
+  pinMode(echoPin, INPUT);
+  duration = pulseIn(echoPin, HIGH);
+  cm = microsecondstoCentimeters(duration);
+  Serial.print("cm front:");
+  Serial.print(cm);
+  Serial.println();
+//  delay(1000);
+  return cm;
+}
+
+int ping_side(){
+  long duration, inches, cm;
+  pinMode(pingPinSide, OUTPUT);
+  digitalWrite(pingPinSide, LOW);
+  delayMicroseconds(2);
+  digitalWrite(pingPinSide, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pingPinSide, LOW);
+  pinMode(echoPinSide, INPUT);
+  duration = pulseIn(echoPinSide, HIGH);
+  cm = microsecondstoCentimeters(duration);
+  Serial.print("cm side:");
+  Serial.print(cm);
+  Serial.println();
+//  delay(1000);
+  return cm;
+}
+
+long microsecondstoCentimeters(long microseconds){
+  return microseconds / 29 / 2;
+}
