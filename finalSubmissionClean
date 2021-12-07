@@ -1,0 +1,368 @@
+//Libraries
+#include <Arduino.h>
+#include <Servo.h>
+
+//ultrasonic
+#define trigPin1 6
+#define trigPin2 5
+#define FrontEchoPin 7
+#define SideEchoPin 8
+
+//motor
+#define enA 2
+#define enB 3
+#define leftForward 4 //motor Pin1
+#define leftBack A5 //motor Pin2
+#define rightForward 11 //motor Pin3
+#define rightBack A4 //motor Pin4
+
+//Phototransistors
+#define irTopRight A3
+#define irTopLeft A0
+#define irBotRight A2
+#define irBotLeft A1
+
+//Servo
+Servo myservo;
+int pos = 800; //current angle of servo motor
+int maxLightPos = 1000; //angle of servo motor with max light reading from phototransistor
+int lightValue = 0; //current reading from phototransitor
+int maxLightValue = 0; //maximum reading from phototransistor
+
+//Calibration Variables for Ultrasonics (in ms)
+unsigned long duration; // variable for the duration of sound wave travel
+unsigned long distance; // variable for the distance measurement
+
+//laser
+#define LED 13
+
+//Global Booleans
+bool drive_mode = true;
+
+/*
+stages of robot:
+  1) Centered: Robot is in the center of the arena.
+  2) Targeting: The robot is scanning for the target.
+  3) Aiming: The turret is searching for the bullseye.
+*/ 
+
+/*
+Note: we have had issues with delay in the past where
+the robot wouldn't work. Delay has been mostly replaced with:
+unsigned long timer = millis();
+while(timer + function_run_time > millis()){
+  ; (do nothing)
+ }
+*/
+void setup() {
+  Serial.begin(9600);
+  Serial.print("beginning");
+  Serial.println();
+  //ultrasonic 1&2
+  pinMode(trigPin1, OUTPUT); // Sets the trigPin as an Output
+  //ultrasonic front
+  pinMode(trigPin2, OUTPUT); // Sets the trigPin as an Output
+  pinMode(FrontEchoPin, INPUT); 
+  //ultrasonic side
+  pinMode(SideEchoPin, INPUT); 
+  //motor
+  pinMode(leftForward, OUTPUT);
+  pinMode(leftBack, OUTPUT);
+  pinMode(rightForward, OUTPUT);
+  pinMode(rightBack, OUTPUT);
+  //laser
+  pinMode(LED, OUTPUT);
+  //Phototransistor
+  pinMode(irTopRight, INPUT);
+  pinMode(irTopLeft, INPUT);
+  pinMode(irBotRight, INPUT);
+  pinMode(irBotLeft, INPUT);
+  //servo
+  myservo.attach(9); 
+  digitalWrite(leftForward, LOW);
+  digitalWrite(leftBack, LOW);
+  digitalWrite(rightForward, LOW);
+  digitalWrite(rightBack, LOW);
+  delay(2000);
+}
+
+void loop() {
+//------------------------------------------------------------------------------------
+//find centre
+  if (drive_mode == true){
+  centerRobot();
+  centerRobot();
+  centerRobot();
+  drive_mode = false;
+  
+  //centre-check (value is biased to low to dodge faulty ultrasonic readings)
+  if(pingDistFront() < 35 || pingDistBack() < 35){
+    centerRobot();
+    centerRobot();
+    }
+  }
+
+//------------------------------------------------------------------------------------
+//targeting
+  if(drive_mode == false){
+    digitalWrite(LED, HIGH);
+    if(find_target(55)){
+      precise_targeting();
+      verticalTargeting();
+    }else if(find_target(70)){
+      precise_targeting();
+      verticalTargeting();
+    }
+  }
+
+
+//centre-check (value is biased to low to dodge faulty ultrasonic readings)
+  if(pingDistFront() < 35 || pingDistBack() < 35){
+    centerRobot();
+    centerRobot();
+  }
+}
+
+//-----------------------------------------------------------------------------------------------------
+//Ultrasonic Code
+unsigned long pingDistFront(){
+  digitalWrite(trigPin1, LOW);
+  delayMicroseconds(2);
+  
+  // Sets the trigPin on HIGH state for 10 micro seconds
+  digitalWrite(trigPin1, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin1, LOW);
+  
+  //Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(FrontEchoPin, HIGH);
+  
+  //Calculating the distance
+  distance = duration*0.034/2;
+  return distance;
+  }
+
+unsigned long pingDistBack(){
+  digitalWrite(trigPin2, LOW);
+  delayMicroseconds(2);
+  
+  // Sets the trigPin on HIGH state for 10 micro seconds
+  digitalWrite(trigPin2, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin2, LOW);
+  
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(SideEchoPin, HIGH);
+  
+  // Calculating the distance
+  distance = duration*0.034/2;
+  return distance;
+  }
+  
+//-----------------------------------------------------------------------------------------------------
+//Servo and Laser
+void verticalTargeting(){
+  //reset any movement the servo motor may have done previously
+    pos = 1000;
+    lightValue = 0;
+    maxLightValue=0;
+    maxLightPos = 1000;
+    myservo.writeMicroseconds(pos);
+    delay(300);
+
+  //sweep through 45 degrees and find angle of maximum light
+  for (pos = 0; pos <= 1500; pos += 1) {
+    myservo.writeMicroseconds(pos);
+    if (maxLightValue < analogRead(irTopRight)) {
+      maxLightValue = analogRead(irTopRight);
+      delayMicroseconds(300); //takes about 100 microseconds to read an analogue input, wait 300 to be safe
+      maxLightPos = pos;
+      Serial.print("loop 1");
+      Serial.println();
+    }
+    delay(1);
+  }
+  //double check max light value by sweeping through again.
+  for (pos = 1500; pos >=0; pos -= 1) {
+    myservo.writeMicroseconds(pos);
+    if (maxLightValue < analogRead(irTopRight)) {
+      maxLightValue = analogRead(irTopRight);
+      delayMicroseconds(300); //takes about 100 microseconds to read an analogue input, wait 300 to be safe
+      maxLightPos = pos;
+    }
+    delay(1);
+  }
+  myservo.writeMicroseconds(maxLightPos); //turn servo towards max light
+  pos = maxLightPos;
+  delay(300); //wait for servo to reach position
+  digitalWrite(LED, HIGH);
+  delay(2000);
+  digitalWrite(LED, LOW);
+}
+
+//-----------------------------------------------------------------------------------------------------
+//Motor code
+void run_forwards(){
+  //configures the motors to drive forward
+  analogWrite(enA, 255);
+  analogWrite(enB, 255);
+  //give motors full power
+  digitalWrite(leftForward, HIGH);
+  digitalWrite(rightForward, HIGH);
+  digitalWrite(leftBack, LOW);
+  digitalWrite(rightBack, LOW);
+}
+
+void turn_clockwise(){
+  //turn clockwise (time determined by delay function after this is called)
+  analogWrite(enA, 255);
+  analogWrite(enB, 255);
+  //give motors full power
+  digitalWrite(leftForward, HIGH);
+  digitalWrite(rightBack, HIGH);
+}
+
+void turn_anticlockwise(){
+  //turn anticlockwise (time determined delay function after this is called)
+  analogWrite(enA, 255);
+  analogWrite(enB, 255);
+  //give motors full power
+  digitalWrite(leftBack, HIGH);
+  digitalWrite(rightForward, HIGH);
+}
+
+void run_backwards(){
+  //drive backwards (time determined delay function after this is called)
+  analogWrite(enA, 255);
+  analogWrite(enB, 255);
+  digitalWrite(leftBack, HIGH);
+  digitalWrite(rightBack, HIGH);
+  digitalWrite(leftForward, LOW);
+  digitalWrite(rightForward, LOW);
+}
+
+void motor_off(){
+  //stop motors
+  analogWrite(enA, 0);
+  analogWrite(enB, 0);
+  //give motors no power (results in an active stop)
+  digitalWrite(leftForward, LOW);
+  digitalWrite(leftBack, LOW);
+  digitalWrite(rightForward, LOW);
+  digitalWrite(rightBack, LOW);
+  //writes all motors to low (results in a passive stop)
+  delay(200);
+}
+
+//-----------------------------------------------------------------------------------------------------
+// Combination Ultrasonic and Motor
+void centerRobot(){
+  findPerp();
+  runToCenter();
+  turn_clockwise();
+  delay(800);
+  findPerp();
+  runToCenter();
+}
+
+void findPerp(){
+  turn_clockwise();
+  while(true){
+    if(99 <=  (pingDistBack()+pingDistFront()+22) && (pingDistBack()+pingDistFront()+22) <= 101){
+      motor_off();
+      return;
+    }
+  }
+}
+
+void runToCenter(){
+  if(pingDistBack() > pingDistFront()){
+    run_backwards();  
+    while(1){
+      if(39 >= pingDistBack()){
+        motor_off();
+        return;
+      }
+    }
+  }else{
+    run_forwards();
+    while(1){
+      if(39 >= pingDistFront()){
+        motor_off();
+        return;
+      }
+    }
+  }
+}
+
+//----------------------------------------------------------------------------------------------------
+//Combined IR and MOTORS
+bool find_target(int pos){
+  motor_off();
+  
+  // starts turning robot
+  turn_clockwise();
+  myservo.write(pos);
+  
+  //finds the closest edge
+  unsigned long side_max = take_readings_targeting();
+  unsigned long breakout_timer = millis();
+  
+  //alligns robot with closest edge
+  while(analogRead(irTopRight) < (side_max - 50)){
+    delayMicroseconds(300); //analogRead takes ~130us, giving it 300us as a safety margin
+
+    if(breakout_timer + 10000 < millis()){
+        motor_off();
+        return false;
+    }
+    
+  }
+  motor_off();
+  return true;
+}
+
+unsigned long take_readings_targeting(){
+  //horizontal target approximation using the top right IR sensor
+  unsigned long side_max = analogRead(irTopRight);
+  unsigned long timer = millis();
+  //6 seconds corresponds to roughly 2 rotations
+  while(timer+6000 > millis()){
+    int rightTopRead = analogRead(irTopRight);
+    delayMicroseconds(300);
+    int rightBotRead = analogRead(irBotRight);
+    delayMicroseconds(300);
+    
+    if(rightTopRead > side_max){
+      side_max = rightTopRead;
+    }
+    else if (rightBotRead > side_max){
+      side_max = rightBotRead;
+    }
+  }
+  return side_max;
+}
+
+void precise_targeting(){
+  unsigned long timer = millis();
+  //function will kill itself off after 15 seconds (limiting precise targeting)
+  while(timer + 15000 > millis()){
+    /*1.05 multiplier to prevent infinite targeting and to dodge erronous 
+    phototransistor readings; 300us delay to ensure IRs are read*/
+    unsigned long irTopRightReading = analogRead(irTopRight);
+    delayMicroseconds(300);
+    unsigned long irTopLeftReading = analogRead(irTopLeft);
+    delayMicroseconds(300);
+    if (irTopLeftReading > (irTopRightReading * 1.01)){
+      turn_anticlockwise();
+      delay(10);
+      motor_off();
+    }
+    
+    else if (irTopRightReading > (irTopLeftReading * 1.01)){
+      turn_clockwise();
+      delay(10);
+      motor_off();
+    }
+  }
+}
