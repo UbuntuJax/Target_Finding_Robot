@@ -1,0 +1,67 @@
+#include <Arduino.h>
+#include <Servo.h>
+
+#define LED 13 //connect laser to digital pin 12
+Servo myservo; //add servo motor object
+
+int pos = 1000; //current angle of servo motor
+int maxLightPos = 1000; //angle of servo motor with max light reading from phototransistor
+int lightValue = 0; //current reading from phototransitor
+int maxLightValue = 0; //maximum reading from phototransistor
+int totalIr = 0; //total Ir to average at each position.
+
+void setup() {
+  myservo.attach(9); //initialise servo motor as attatched to PWM pin 9
+  pinMode(LED, OUTPUT); //initialise digital pin 13 as output
+  Serial.begin(9600);
+}
+
+void loop() {
+  //reset any movement the servo motor may have done previously
+  // if (pos != 1000) {
+    pos = 1000;
+    lightValue = 0;
+    maxLightValue=0;
+    maxLightPos = 1000;
+    myservo.writeMicroseconds(pos);
+    delay(300);
+  // }
+
+  //sweep through 45 degrees and find angle of maximum light
+  for (pos = 0; pos <= 1000; pos += 1) {
+    myservo.writeMicroseconds(pos);
+
+    for (int i = 0; i < 10; i++) {
+      totalIr += analogRead(A0);
+    }
+    if (maxLightValue < (totalIr / 10)) {
+      maxLightValue = (totalIr / 10);
+      maxLightPos = pos;
+    }
+    totalIr = 0;
+    delay(3);
+  }
+  //double check max light value by sweeping through again.
+  for (pos = 1000; pos >=0; pos -= 1) {
+    myservo.writeMicroseconds(pos);
+    for (int i = 0; i < 10; i++) {
+      totalIr += analogRead(A0);
+    }
+    if (maxLightValue < (totalIr / 10)) {
+      maxLightValue = (totalIr / 10);
+      maxLightPos = pos;
+    }
+    totalIr = 0;
+    delay(3);
+  }
+  myservo.writeMicroseconds(maxLightPos); //turn servo towards max light
+  pos = maxLightPos;
+  Serial.print("maxLightPos: ");
+  Serial.print(maxLightPos);
+  Serial.println();
+  delay(300); //wait for servo to reach position
+  digitalWrite(LED, HIGH); //turn on laser
+  delay(500); //for 500ms
+  digitalWrite(LED, LOW); //turn off laser
+  delay(2000); // wait 5 seconds before looping
+}
