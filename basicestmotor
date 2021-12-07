@@ -1,0 +1,33 @@
+//motor
+#define motorPin1 4 
+#define motorPin2 A5 
+#define motorPin3 11 
+#define motorPin4 A4 
+#define enA 3
+#define enB 2
+#include <Servo.h>
+Servo myServo;
+void setup() {
+  // put your setup code here, to run once:
+  pinMode(motorPin1, OUTPUT);
+  pinMode(motorPin2, OUTPUT);
+  pinMode(motorPin3, OUTPUT);
+  pinMode(motorPin4, OUTPUT);
+  pinMode(enA, OUTPUT);
+  pinMode(enB, OUTPUT);
+  analogWrite(enA, 255);
+  analogWrite(enB, 255);
+  Serial.begin(9600);
+  Serial.print("reset");
+  Serial.println();
+  myServo.attach(9);
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  digitalWrite(motorPin1, HIGH);
+  digitalWrite(motorPin2, LOW);
+  digitalWrite(motorPin3, HIGH);
+  digitalWrite(motorPin4, LOW);
+  
+}
