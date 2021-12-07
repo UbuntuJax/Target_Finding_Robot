@@ -1,0 +1,30 @@
+#define LASER 13
+#define test 2
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+  Serial.print("reset");
+  Serial.println();
+  pinMode(LASER, OUTPUT);
+  digitalWrite(LASER, HIGH);
+  digitalWrite(test, HIGH);
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  int TopLeft = analogRead(A1); 
+  int TopRight = analogRead(A0); 
+  int BotLeft = analogRead(A3); 
+  int BotRight = analogRead(A2); 
+  Serial.print("TopLeft: ");
+  Serial.print(TopLeft);
+  Serial.print(" TopRight ");
+  Serial.print(TopRight);
+  Serial.print(" BotLeft ");
+  Serial.print(BotLeft);
+  Serial.print(" BotRight ");
+  Serial.print(BotRight);
+  Serial.println();
+  delay(1000);
+}
